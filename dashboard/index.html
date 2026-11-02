@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Inventory Sync</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <span class="logo" aria-hidden="true"></span>
+        <div>
+          <h1>Inventory Sync</h1>
+          <p class="subtitle">ERP → Shop · Bestandsabgleich</p>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <span id="scheduler-status" class="pill">Verbinde …</span>
+        <button id="toggle-scheduler" class="button secondary" type="button" hidden>Pausieren</button>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div>
+          <h2 class="hero-title">Lagerbestände automatisch abgleichen</h2>
+          <p class="muted" id="cadence">Das ERP ist die führende Quelle.</p>
+        </div>
+        <div class="actions">
+          <button class="button" type="button" data-mode="incremental">Sync jetzt</button>
+          <button class="button secondary" type="button" data-mode="full">Vollabgleich</button>
+          <button class="button secondary" type="button" data-mode="full" data-dry-run="true">Dry-Run</button>
+        </div>
+      </section>
+
+      <div id="banner" class="banner" role="alert" hidden></div>
+
+      <section class="stats" aria-label="Kennzahlen">
+        <article class="stat">
+          <span class="stat-label">Synchron</span>
+          <span class="stat-value ok" id="stat-sync">–</span>
+          <span class="stat-hint" id="stat-sync-hint">&nbsp;</span>
+        </article>
+        <article class="stat">
+          <span class="stat-label">Probleme</span>
+          <span class="stat-value danger" id="stat-problems">–</span>
+          <span class="stat-hint">Fehler oder blockiert</span>
+        </article>
+        <article class="stat">
+          <span class="stat-label">Ohne Gegenstück</span>
+          <span class="stat-value info" id="stat-unmatched">–</span>
+          <span class="stat-hint">fehlt im Shop oder nur im Shop</span>
+        </article>
+        <article class="stat">
+          <span class="stat-label">Läufe · 24 h</span>
+          <span class="stat-value" id="stat-runs">–</span>
+          <span class="stat-hint" id="stat-runs-hint">&nbsp;</span>
+        </article>
+        <article class="stat">
+          <span class="stat-label">Abgefangene Retries · 24 h</span>
+          <span class="stat-value warn" id="stat-retries">–</span>
+          <span class="stat-hint">429 / 5xx automatisch wiederholt</span>
+        </article>
+      </section>
+
+      <section class="card">
+        <div class="card-header">
+          <h2>Bestandsgesundheit</h2>
+          <span class="muted">Anteil der SKUs je Status</span>
+        </div>
+        <div class="chart-body">
+          <div id="status-bar" class="segmented" role="img"></div>
+          <div id="status-legend" class="legend"></div>
+        </div>
+      </section>
+
+      <div class="grid-2">
+        <section class="card">
+          <div class="card-header">
+            <h2>ERP vs. Shop je SKU</h2>
+            <span class="muted">Punkte decken sich = synchron</span>
+          </div>
+          <div class="chart-body">
+            <div class="legend">
+              <span class="legend-item"><span class="key" style="--key: var(--series-1)"></span>ERP</span>
+              <span class="legend-item"><span class="key" style="--key: var(--series-2)"></span>Shop</span>
+            </div>
+            <div id="stock-chart" class="chart"></div>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="card-header">
+            <h2>Läufe im Verlauf</h2>
+            <span class="muted">letzte 20 gespeicherte Läufe</span>
+          </div>
+          <div class="chart-body">
+            <div class="legend">
+              <span class="legend-item"><span class="key" style="--key: var(--series-1)"></span>Geändert</span>
+              <span class="legend-item"><span class="key" style="--key: var(--status-critical)"></span>Fehlgeschlagen</span>
+            </div>
+            <div id="runs-chart" class="chart"></div>
+          </div>
+        </section>
+      </div>
+
+      <section class="card">
+        <div class="card-header">
+          <h2>Lagerbestände</h2>
+          <span class="muted" id="inventory-meta">–</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>SKU</th>
+                <th>Produkt</th>
+                <th class="num">ERP</th>
+                <th class="num">Shop</th>
+                <th>Status</th>
+                <th>Zuletzt geschrieben</th>
+                <th class="demo-only">ERP-Bestand ändern</th>
+              </tr>
+            </thead>
+            <tbody id="inventory">
+              <tr><td colspan="7" class="empty">Lade Daten …</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <div class="grid-2">
+        <section class="card">
+          <div class="card-header">
+            <h2>Letzte Läufe</h2>
+            <span class="muted">leere automatische Läufe werden nicht gespeichert</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Art</th>
+                  <th>Status</th>
+                  <th class="num">Änd.</th>
+                  <th class="num">Fehler</th>
+                  <th class="num">Dauer</th>
+                  <th>Zeit</th>
+                </tr>
+              </thead>
+              <tbody id="runs">
+                <tr><td colspan="7" class="empty">Noch keine Läufe.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="card-header">
+            <h2>Aktivität</h2>
+            <span class="muted">jede Änderung mit Versuchen und Dauer</span>
+          </div>
+          <ol id="events" class="feed">
+            <li class="empty">Noch keine Aktivität.</li>
+          </ol>
+        </section>
+      </div>
+
+      <section class="card demo-only" id="chaos-card">
+        <div class="card-header">
+          <h2>Störungen simulieren</h2>
+          <span class="muted">wirkt auf die Shop-API, um Retry und Backoff live zu zeigen</span>
+        </div>
+        <form id="chaos-form" class="chaos-form">
+          <label class="field">
+            <span class="field-label">Fehlerrate <output id="failure-rate-output">0 %</output></span>
+            <input type="range" name="failure_rate" min="0" max="100" step="5" value="0">
+            <span class="field-hint">Anteil der Anfragen, die mit 503 scheitern</span>
+          </label>
+          <label class="field">
+            <span class="field-label">Latenz (ms)</span>
+            <input type="number" name="latency_ms" min="0" max="10000" step="50" value="0">
+            <span class="field-hint">künstliche Verzögerung pro Anfrage</span>
+          </label>
+          <label class="field">
+            <span class="field-label">Rate Limit (Anfragen / 10 s)</span>
+            <input type="number" name="rate_limit_requests" min="1" max="1000" step="1" value="10">
+            <span class="field-hint">darüber antwortet der Shop mit 429</span>
+          </label>
+          <div class="chaos-actions">
+            <button class="button" type="submit">Anwenden</button>
+            <button class="button secondary" type="button" id="chaos-reset">Zurücksetzen</button>
+          </div>
+        </form>
+      </section>
+    </main>
+
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+    <div id="chart-tooltip" class="chart-tooltip" role="tooltip" hidden></div>
+
+    <script src="/charts.js"></script>
+    <script src="/app.js"></script>
+  </body>
+</html>
