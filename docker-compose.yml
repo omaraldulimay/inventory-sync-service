@@ -1,0 +1,54 @@
+# Local demo stack. The credentials below are for this throwaway database only.
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: sync
+      POSTGRES_PASSWORD: sync
+      POSTGRES_DB: inventory_sync
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sync -d inventory_sync"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  mock-systems:
+    build: .
+    image: inventory-sync:local
+    command: ["uvicorn", "mock_systems.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    ports:
+      - "8000:8000"
+    environment:
+      SHOP_RATE_LIMIT_REQUESTS: "10"
+      SHOP_RATE_LIMIT_WINDOW_SECONDS: "10"
+      SHOP_FAILURE_RATE: "0.0"
+      SHOP_LATENCY_MS: "0"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  sync-service:
+    image: inventory-sync:local
+    ports:
+      - "8001:8001"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://sync:sync@postgres:5432/inventory_sync
+      ERP_BASE_URL: http://mock-systems:8000
+      SHOP_BASE_URL: http://mock-systems:8000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mock-systems:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  postgres-data:
