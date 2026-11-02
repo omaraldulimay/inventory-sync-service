@@ -1,0 +1,16 @@
+[project]
+name = "inventory-sync-service"
+version = "0.1.0"
+description = "Reliable stock synchronisation between an ERP and an e-commerce shop"
+requires-python = ">=3.12"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "RUF"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
