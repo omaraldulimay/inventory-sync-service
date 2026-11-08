@@ -2,6 +2,8 @@
 
 [![CI](https://github.com/omaraldulimay/inventory-sync-service/actions/workflows/ci.yml/badge.svg)](https://github.com/omaraldulimay/inventory-sync-service/actions/workflows/ci.yml)
 
+▶ **Try it in the browser:** [interactive demo on my portfolio](https://omaraldulimay.github.io/projekte/inventory-sync.html#demo)
+
 A service that keeps stock levels in an online shop in line with the ERP – reliably, even when the shop's API
 rate-limits, times out or fails. Built with FastAPI, async SQLAlchemy and PostgreSQL, with a live dashboard.
 
